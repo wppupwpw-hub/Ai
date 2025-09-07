@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مساعدك الصوتي بالذكاء الاصطناعي</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background: linear-gradient(135deg, #1A202C 0%, #0c1524 100%);
+            min-height: 100vh;
+            color: #E2E8F0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding-bottom: 8rem;
+        }
+        .ai-message-box {
+            background-color: rgba(45, 55, 72, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 600px;
+            padding: 1.5rem;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+            margin-bottom: 2rem;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .ai-message-box.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) translateY(0);
+        }
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+            position: absolute;
+            bottom: 3rem;
+        }
+        .icon-button {
+            width: 4rem;
+            height: 4rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        .icon-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        .icon-button.pulse-animation {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+            }
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- AI Message Box -->
+        <div id="ai-message-box" class="ai-message-box">
+            <p id="ai-message-text" class="text-xl font-medium">مرحباً! أنا جاهز لمساعدتك.</p>
+        </div>
+
+        <!-- Buttons at the bottom -->
+        <div class="action-buttons">
+            <!-- Left Button -->
+            <button id="left-button" class="icon-button bg-gray-600 text-white hidden">
+                <i class="fas fa-pause w-8 h-8"></i>
+            </button>
+            
+            <!-- Center AI Button -->
+            <button id="ai-button" class="icon-button bg-blue-600 text-white">
+                <i class="fa-solid fa-brain w-12 h-12"></i>
+            </button>
+            
+            <!-- Right Button -->
+            <button id="right-button" class="icon-button bg-gray-600 text-white hidden">
+                <i class="fas fa-times w-8 h-8"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // A helper function to display a custom message with animation
+        function showMessage(message) {
+            const aiMessageBox = document.getElementById('ai-message-box');
+            const aiMessageText = document.getElementById('ai-message-text');
+            aiMessageBox.classList.remove('show');
+            setTimeout(() => {
+                aiMessageText.textContent = message;
+                aiMessageBox.classList.add('show');
+            }, 500);
+        }
+
+        // A helper function to convert PCM to WAV
+        function pcmToWav(pcm16Data, sampleRate) {
+            const dataLength = pcm16Data.length * 2;
+            const buffer = new ArrayBuffer(44 + dataLength);
+            const view = new DataView(buffer);
+            let offset = 0;
+            function writeString(str) {
+                for (let i = 0; i < str.length; i++) {
+                    view.setUint8(offset++, str.charCodeAt(i));
+                }
+            }
+            function writeUint32(val) {
+                view.setUint32(offset, val, true);
+                offset += 4;
+            }
+            function writeUint16(val) {
+                view.setUint16(offset, val, true);
+                offset += 2;
+            }
+            writeString('RIFF');
+            writeUint32(36 + dataLength);
+            writeString('WAVE');
+            writeString('fmt ');
+            writeUint32(16);
+            writeUint16(1);
+            writeUint16(1); // Mono
+            writeUint32(sampleRate);
+            writeUint32(sampleRate * 2);
+            writeUint16(2);
+            writeUint16(16);
+            writeString('data');
+            writeUint32(dataLength);
+            const pcmView = new Int16Array(buffer, 44);
+            pcmView.set(pcm16Data);
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        window.onload = function() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                const aiButton = document.getElementById('ai-button');
+                aiButton.disabled = true;
+                showMessage('التعرف على الكلام غير مدعوم في متصفحك.');
+                return;
+            }
+
+            const aiButton = document.getElementById('ai-button');
+            const leftButton = document.getElementById('left-button');
+            const rightButton = document.getElementById('right-button');
+            
+            const recognition = new SpeechRecognition();
+            const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
+            let currentAudio = null;
+            let currentTranscript = '';
+
+            recognition.lang = 'ar-SA';
+            recognition.interimResults = false;
+            recognition.continuous = false;
+
+            let isRecording = false;
+
+            aiButton.addEventListener('click', () => {
+                if (!isRecording) {
+                    if (currentAudio) {
+                        currentAudio.pause();
+                        currentAudio.currentTime = 0;
+                    }
+                    try {
+                        recognition.start();
+                        isRecording = true;
+                        aiButton.classList.remove('bg-blue-600');
+                        aiButton.classList.add('bg-red-600', 'pulse-animation');
+                        leftButton.classList.remove('hidden');
+                        rightButton.classList.remove('hidden');
+                        showMessage('جاري الاستماع...');
+                        currentTranscript = '';
+                    } catch (error) {
+                        console.error('Error starting recognition:', error);
+                        showMessage('حدث خطأ أثناء بدء التسجيل.');
+                    }
+                } else {
+                    recognition.stop();
+                    isRecording = false;
+                    aiButton.classList.remove('bg-red-600', 'pulse-animation');
+                    aiButton.classList.add('bg-blue-600');
+                    leftButton.classList.add('hidden');
+                    rightButton.classList.add('hidden');
+                    showMessage('تم إيقاف التسجيل.');
+                }
+            });
+
+            leftButton.addEventListener('click', () => {
+                if (currentAudio) {
+                    currentAudio.pause();
+                }
+                showMessage('تم إيقاف الصوت مؤقتاً.');
+            });
+
+            rightButton.addEventListener('click', () => {
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                    currentAudio = null;
+                }
+                showMessage('تم إلغاء الصوت.');
+            });
+
+            recognition.onresult = (event) => {
+                currentTranscript = event.results[0][0].transcript;
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                let errorMessage = 'حدث خطأ. يرجى التحقق من اتصالك بالإنترنت.';
+                if (event.error === 'no-speech') {
+                    errorMessage = 'لم يتم الكشف عن أي صوت. حاول التحدث بصوت أعلى.';
+                } else if (event.error === 'not-allowed') {
+                    errorMessage = 'تم رفض إذن الوصول إلى الميكروفون.';
+                }
+                showMessage(errorMessage);
+                isRecording = false;
+                aiButton.classList.remove('bg-red-600', 'pulse-animation');
+                aiButton.classList.add('bg-blue-600');
+                leftButton.classList.add('hidden');
+                rightButton.classList.add('hidden');
+            };
+            
+            recognition.onend = () => {
+                isRecording = false;
+                aiButton.classList.remove('bg-red-600', 'pulse-animation');
+                aiButton.classList.add('bg-blue-600');
+                leftButton.classList.add('hidden');
+                rightButton.classList.add('hidden');
+                if (currentTranscript.trim() !== '') {
+                    sendToAPI(currentTranscript);
+                } else {
+                    showMessage('لم يتم اكتشاف كلام.');
+                }
+            };
+            
+            async function sendToAPI(textToSend) {
+                showMessage('جاري تحليل كلامك');
+                try {
+                    // Part 1: Get text from Gemini
+                    const textApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+                    
+                    const textPayload = {
+                        contents: [{
+                            parts: [{ text: textToSend }]
+                        }],
+                    };
+                    const textResponse = await fetch(textApiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(textPayload)
+                    });
+                    if (!textResponse.ok) {
+                        const errorData = await textResponse.json();
+                        throw new Error(`API Error: ${textResponse.status} - ${JSON.stringify(errorData)}`);
+                    }
+                    const textResult = await textResponse.json();
+                    let generatedText = '';
+                    if (textResult && textResult.candidates && textResult.candidates.length > 0) {
+                        generatedText = textResult.candidates[0].content.parts[0].text;
+                    } else {
+                        throw new Error('No valid text response received from AI.');
+                    }
+                    
+                    // Part 2: Get audio from TTS model
+                    const audioApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${API_KEY}`;
+                    const audioPayload = {
+                        contents: [{
+                            parts: [{ text: generatedText }]
+                        }],
+                        generationConfig: {
+                            responseModalities: ["AUDIO"],
+                            speechConfig: {
+                                voiceConfig: {
+                                    prebuiltVoiceConfig: { voiceName: "Iapetus" }
+                                }
+                            }
+                        },
+                    };
+                    const audioResponse = await fetch(audioApiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(audioPayload)
+                    });
+                    if (!audioResponse.ok) {
+                        const errorData = await audioResponse.json();
+                        throw new Error(`Audio API Error: ${audioResponse.status} - ${JSON.stringify(errorData)}`);
+                    }
+                    const audioResult = await audioResponse.json();
+                    let audioData = null;
+                    let mimeType = null;
+                    if (audioResult && audioResult.candidates && audioResult.candidates.length > 0) {
+                        const audioPart = audioResult.candidates[0].content.parts.find(p => p.inlineData && p.inlineData.mimeType.startsWith('audio/'));
+                        if (audioPart) {
+                            audioData = audioPart.inlineData.data;
+                            mimeType = audioPart.inlineData.mimeType;
+                        }
+                    } else {
+                        throw new Error('No valid audio response received from AI.');
+                    }
+                    
+                    if (audioData && mimeType) {
+                        const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1], 10);
+                        const pcmData = base64ToArrayBuffer(audioData);
+                        const pcm16 = new Int16Array(pcmData);
+                        const wavBlob = pcmToWav(pcm16, sampleRate);
+                        const audioUrl = URL.createObjectURL(wavBlob);
+                        
+                        currentAudio = new Audio(audioUrl);
+                        currentAudio.play();
+                        showMessage('الرد جاهز.');
+                    } else {
+                        throw new Error('لم يتم استلام رد صوتي صالح من الذكاء الاصطناعي.');
+                    }
+                } catch (error) {
+                    console.error('Error fetching data from API:', error);
+                    showMessage('حدث خطأ. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.');
+                }
+            }
+        };
+    </script>
+</body>
+</html>
