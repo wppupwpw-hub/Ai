@@ -19,3 +19,4 @@ exports.handler = async function(event, context) {
     body: JSON.stringify({ API_KEY: API_KEY })
   };
 };
+.
