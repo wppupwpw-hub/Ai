@@ -189,7 +189,7 @@
             const rightButton = document.getElementById('right-button');
             
             const recognition = new SpeechRecognition();
-            const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
+            
             let currentAudio = null;
             let currentTranscript = '';
 
@@ -281,9 +281,15 @@
             async function sendToAPI(textToSend) {
                 showMessage('جاري تحليل كلامك');
                 try {
+                    // Call the Netlify function to get the API key
+                    const apiKeyResponse = await fetch('/.netlify/functions/get-api-key');
+                    if (!apiKeyResponse.ok) {
+                        throw new Error('Failed to get API key from Netlify function.');
+                    }
+                    const apiKey = (await apiKeyResponse.json()).API_KEY;
+
                     // Part 1: Get text from Gemini
-                    const textApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
-                    
+                    const textApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
                     const textPayload = {
                         contents: [{
                             parts: [{ text: textToSend }]
@@ -307,7 +313,7 @@
                     }
                     
                     // Part 2: Get audio from TTS model
-                    const audioApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${API_KEY}`;
+                    const audioApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
                     const audioPayload = {
                         contents: [{
                             parts: [{ text: generatedText }]
@@ -365,3 +371,4 @@
     </script>
 </body>
 </html>
+
