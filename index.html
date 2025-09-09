@@ -87,10 +87,62 @@
                 box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
             }
         }
+        .language-container {
+            position: absolute;
+            top: 2rem;
+            right: 2rem;
+        }
+        .language-button {
+            background-color: rgba(45, 55, 72, 0.8);
+            backdrop-filter: blur(10px);
+            color: #E2E8F0;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .language-button:hover {
+            background-color: rgba(74, 85, 104, 0.8);
+        }
+        .language-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: rgba(45, 55, 72, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            margin-top: 0.5rem;
+            z-index: 10;
+            display: none;
+            flex-direction: column;
+            gap: 0.25rem;
+            min-width: 120px;
+        }
+        .language-dropdown button {
+            text-align: right;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            transition: background-color 0.2s;
+        }
+        .language-dropdown button:hover {
+            background-color: rgba(74, 85, 104, 0.8);
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Language Switch Dropdown -->
+        <div class="language-container">
+            <button id="lang-dropdown-button" class="language-button">العربية</button>
+            <div id="lang-dropdown-menu" class="language-dropdown">
+                <button data-lang="ar">العربية</button>
+                <button data-lang="en">English</button>
+                <button data-lang="zh">中文</button>
+            </div>
+        </div>
+
         <!-- AI Message Box -->
         <div id="ai-message-box" class="ai-message-box">
             <p id="ai-message-text" class="text-xl font-medium">مرحباً! أنا جاهز لمساعدتك.</p>
@@ -117,15 +169,82 @@
 
     <script>
         // A helper function to display a custom message with animation
-        function showMessage(message) {
+        const messages = {
+            'ar': {
+                'initial': 'مرحباً! أنا جاهز لمساعدتك.',
+                'listening': 'جاري الاستماع...',
+                'analyzing': 'جاري تحليل كلامك',
+                'response_ready': 'الرد جاهز.',
+                'speech_unsupported': 'التعرف على الكلام غير مدعوم في متصفحك.',
+                'rec_paused': 'تم إيقاف التسجيل.',
+                'no_speech': 'لم يتم اكتشاف كلام.',
+                'rec_error': 'حدث خطأ. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.',
+                'mic_denied': 'تم رفض إذن الوصول إلى الميكروفون.',
+                'audio_paused': 'تم إيقاف الصوت مؤقتاً.',
+                'audio_cancelled': 'تم إلغاء الصوت.'
+            },
+            'en': {
+                'initial': 'Hello! I am ready to assist you.',
+                'listening': 'Listening...',
+                'analyzing': 'Analyzing your speech',
+                'response_ready': 'Response is ready.',
+                'speech_unsupported': 'Speech recognition is not supported in your browser.',
+                'rec_paused': 'Recording stopped.',
+                'no_speech': 'No speech was detected.',
+                'rec_error': 'An error occurred. Please check your internet connection and try again.',
+                'mic_denied': 'Microphone access permission was denied.',
+                'audio_paused': 'Audio paused.',
+                'audio_cancelled': 'Audio cancelled.'
+            },
+            'zh': {
+                'initial': '你好！我已准备好为您提供帮助。',
+                'listening': '正在听...',
+                'analyzing': '正在分析您的语音',
+                'response_ready': '回复已准备好。',
+                'speech_unsupported': '您的浏览器不支持语音识别。',
+                'rec_paused': '录音已停止。',
+                'no_speech': '未检测到任何语音。',
+                'rec_error': '发生了一个错误。请检查您的网络连接并重试。',
+                'mic_denied': '麦克风访问权限被拒绝。',
+                'audio_paused': '音频已暂停。',
+                'audio_cancelled': '音频已取消。'
+            }
+        };
+        const langConfig = {
+            'ar': { code: 'ar-SA', dir: 'rtl', text: 'العربية', voice: 'Iapetus' },
+            'en': { code: 'en-US', dir: 'ltr', text: 'English', voice: 'Enceladus' },
+            'zh': { code: 'zh-CN', dir: 'ltr', text: '中文', voice: 'Puck' }
+        };
+
+        let currentLang = 'ar';
+        const langDropdownButton = document.getElementById('lang-dropdown-button');
+        const langDropdownMenu = document.getElementById('lang-dropdown-menu');
+        const aiMessageText = document.getElementById('ai-message-text');
+
+        function showMessage(messageKey) {
+            const message = messages[currentLang][messageKey];
             const aiMessageBox = document.getElementById('ai-message-box');
-            const aiMessageText = document.getElementById('ai-message-text');
             aiMessageBox.classList.remove('show');
             setTimeout(() => {
                 aiMessageText.textContent = message;
                 aiMessageBox.classList.add('show');
             }, 500);
         }
+        
+        langDropdownButton.addEventListener('click', () => {
+            langDropdownMenu.style.display = langDropdownMenu.style.display === 'flex' ? 'none' : 'flex';
+        });
+
+        langDropdownMenu.querySelectorAll('button').forEach(button => {
+            button.addEventListener('click', () => {
+                const newLang = button.dataset.lang;
+                if (newLang !== currentLang) {
+                    currentLang = newLang;
+                    updateLang();
+                }
+                langDropdownMenu.style.display = 'none';
+            });
+        });
 
         // A helper function to convert PCM to WAV
         function pcmToWav(pcm16Data, sampleRate) {
@@ -180,7 +299,7 @@
             if (!SpeechRecognition) {
                 const aiButton = document.getElementById('ai-button');
                 aiButton.disabled = true;
-                showMessage('التعرف على الكلام غير مدعوم في متصفحك.');
+                showMessage('speech_unsupported');
                 return;
             }
 
@@ -193,7 +312,18 @@
             let currentAudio = null;
             let currentTranscript = '';
 
-            recognition.lang = 'ar-SA';
+            const updateLang = () => {
+                const htmlTag = document.documentElement;
+                const config = langConfig[currentLang];
+                htmlTag.setAttribute('lang', config.code);
+                htmlTag.setAttribute('dir', config.dir);
+                langDropdownButton.textContent = config.text;
+                recognition.lang = config.code;
+                showMessage('initial');
+            };
+
+            updateLang();
+
             recognition.interimResults = false;
             recognition.continuous = false;
 
@@ -212,11 +342,11 @@
                         aiButton.classList.add('bg-red-600', 'pulse-animation');
                         leftButton.classList.remove('hidden');
                         rightButton.classList.remove('hidden');
-                        showMessage('جاري الاستماع...');
+                        showMessage('listening');
                         currentTranscript = '';
                     } catch (error) {
                         console.error('Error starting recognition:', error);
-                        showMessage('حدث خطأ أثناء بدء التسجيل.');
+                        showMessage('rec_error');
                     }
                 } else {
                     recognition.stop();
@@ -225,7 +355,7 @@
                     aiButton.classList.add('bg-blue-600');
                     leftButton.classList.add('hidden');
                     rightButton.classList.add('hidden');
-                    showMessage('تم إيقاف التسجيل.');
+                    showMessage('rec_paused');
                 }
             });
 
@@ -233,7 +363,7 @@
                 if (currentAudio) {
                     currentAudio.pause();
                 }
-                showMessage('تم إيقاف الصوت مؤقتاً.');
+                showMessage('audio_paused');
             });
 
             rightButton.addEventListener('click', () => {
@@ -242,7 +372,7 @@
                     currentAudio.currentTime = 0;
                     currentAudio = null;
                 }
-                showMessage('تم إلغاء الصوت.');
+                showMessage('audio_cancelled');
             });
 
             recognition.onresult = (event) => {
@@ -251,13 +381,13 @@
 
             recognition.onerror = (event) => {
                 console.error('Speech recognition error:', event.error);
-                let errorMessage = 'حدث خطأ. يرجى التحقق من اتصالك بالإنترنت.';
+                let errorMessageKey = 'rec_error';
                 if (event.error === 'no-speech') {
-                    errorMessage = 'لم يتم الكشف عن أي صوت. حاول التحدث بصوت أعلى.';
+                    errorMessageKey = 'no_speech';
                 } else if (event.error === 'not-allowed') {
-                    errorMessage = 'تم رفض إذن الوصول إلى الميكروفون.';
+                    errorMessageKey = 'mic_denied';
                 }
-                showMessage(errorMessage);
+                showMessage(errorMessageKey);
                 isRecording = false;
                 aiButton.classList.remove('bg-red-600', 'pulse-animation');
                 aiButton.classList.add('bg-blue-600');
@@ -272,14 +402,14 @@
                 leftButton.classList.add('hidden');
                 rightButton.classList.add('hidden');
                 if (currentTranscript.trim() !== '') {
-                    sendToAPI(currentTranscript);
+                    sendToAPI(currentTranscript, currentLang);
                 } else {
-                    showMessage('لم يتم اكتشاف كلام.');
+                    showMessage('no_speech');
                 }
             };
             
-            async function sendToAPI(textToSend) {
-                showMessage('جاري تحليل كلامك');
+            async function sendToAPI(textToSend, lang) {
+                showMessage('analyzing');
                 try {
                     // Call the Netlify function to get the API key
                     const apiKeyResponse = await fetch('/.netlify/functions/get-api-key');
@@ -322,7 +452,7 @@
                             responseModalities: ["AUDIO"],
                             speechConfig: {
                                 voiceConfig: {
-                                    prebuiltVoiceConfig: { voiceName: "Iapetus" }
+                                    prebuiltVoiceConfig: { voiceName: langConfig[lang].voice }
                                 }
                             }
                         },
@@ -358,13 +488,13 @@
                         
                         currentAudio = new Audio(audioUrl);
                         currentAudio.play();
-                        showMessage('الرد جاهز.');
+                        showMessage('response_ready');
                     } else {
                         throw new Error('لم يتم استلام رد صوتي صالح من الذكاء الاصطناعي.');
                     }
                 } catch (error) {
                     console.error('Error fetching data from API:', error);
-                    showMessage('حدث خطأ. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.');
+                    showMessage('rec_error');
                 }
             }
         };
