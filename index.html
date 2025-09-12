@@ -215,7 +215,7 @@
             'en': { code: 'en-US', dir: 'ltr', text: 'English', voice: 'Enceladus' },
             'zh': { code: 'zh-CN', dir: 'ltr', text: '中文', voice: 'Puck' }
         };
-
+        
         let currentLang = 'ar';
         const langDropdownButton = document.getElementById('lang-dropdown-button');
         const langDropdownMenu = document.getElementById('lang-dropdown-menu');
@@ -230,9 +230,28 @@
                 aiMessageBox.classList.add('show');
             }, 500);
         }
+
+        const updateLang = () => {
+            const htmlTag = document.documentElement;
+            const config = langConfig[currentLang];
+            htmlTag.setAttribute('lang', config.code);
+            htmlTag.setAttribute('dir', config.dir);
+            langDropdownButton.textContent = config.text;
+            if (typeof recognition !== 'undefined') {
+                 recognition.lang = config.code;
+            }
+            showMessage('initial');
+        };
         
-        langDropdownButton.addEventListener('click', () => {
+        langDropdownButton.addEventListener('click', (event) => {
+            event.stopPropagation();
             langDropdownMenu.style.display = langDropdownMenu.style.display === 'flex' ? 'none' : 'flex';
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!langDropdownMenu.contains(event.target) && !langDropdownButton.contains(event.target)) {
+                langDropdownMenu.style.display = 'none';
+            }
         });
 
         langDropdownMenu.querySelectorAll('button').forEach(button => {
@@ -311,16 +330,6 @@
             
             let currentAudio = null;
             let currentTranscript = '';
-
-            const updateLang = () => {
-                const htmlTag = document.documentElement;
-                const config = langConfig[currentLang];
-                htmlTag.setAttribute('lang', config.code);
-                htmlTag.setAttribute('dir', config.dir);
-                langDropdownButton.textContent = config.text;
-                recognition.lang = config.code;
-                showMessage('initial');
-            };
 
             updateLang();
 
